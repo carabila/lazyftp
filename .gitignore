@@ -8,6 +8,7 @@
 *.so
 *.dylib
 lazyftp
+lazyftp.log
 
 # Built by assets/demo.tape -- the source at assets/sftpd/main.go stays tracked
 /assets/sftpd/sftpd
