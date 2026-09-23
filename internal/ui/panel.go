@@ -217,6 +217,10 @@ type Panel struct {
 
 	deleting      bool
 	deletingFiles []model.FileInfo // snapshot of selectedFiles() taken when delete was triggered
+
+	restoreSelectionName    string
+	restoreSelectionIndex   int
+	restoreSelectionPending bool
 }
 
 // Local paths follow the host's rules; remote paths are always POSIX.
@@ -305,23 +309,64 @@ func NewPanel(title string, local bool) Panel {
 
 // WithFiles returns the command applySort's SetItems produces, which callers
 // must run: with filtering enabled (#31), the list needs it to rebuild the
-// filtered view against the new items, or a panel reloaded while a filter is
-// active (via refresh, navigation, or a completed transfer) would show no
-// files at all.
+// filtered view against the new items. Reloading the same directory restores
+// the cursor by filename; entering a different directory starts at the top.
 func (p Panel) WithFiles(files []model.FileInfo, dir string) (Panel, tea.Cmd) {
+	oldPath := p.path
+	selected, hadSelection := p.list.SelectedItem().(fileItem)
+	selectedIndex := p.list.Index()
+
 	p.files = files
 	p.path = p.cleanPath(dir)
 	p.marked = make(map[string]bool)
 	p, cmd := p.applySort()
-	p.list.Select(0)
 	p.list.SetDelegate(fileDelegate{marked: p.marked})
+
+	if oldPath != p.path {
+		p.restoreSelectionPending = false
+		p.restoreSelectionName = ""
+		p.list.Select(0)
+	} else if p.list.FilterState() == list.Unfiltered {
+		name := ""
+		if hadSelection {
+			name = selected.file.Name
+		}
+		p = p.restoreCursor(name, selectedIndex)
+		p.restoreSelectionPending = false
+	} else {
+		p.restoreSelectionName = ""
+		if hadSelection {
+			p.restoreSelectionName = selected.file.Name
+		}
+		p.restoreSelectionIndex = selectedIndex
+		p.restoreSelectionPending = true
+		p.list.Select(0)
+	}
 	return p, cmd
+}
+
+func (p Panel) restoreCursor(name string, fallbackIndex int) Panel {
+	items := p.list.VisibleItems()
+	if name != "" {
+		for i, item := range items {
+			if file, ok := item.(fileItem); ok && file.file.Name == name {
+				p.list.Select(i)
+				return p
+			}
+		}
+	}
+	if len(items) == 0 {
+		p.list.Select(0)
+		return p
+	}
+	p.list.Select(min(max(fallbackIndex, 0), len(items)-1))
+	return p
 }
 
 // applySort re-sorts p.files by the panel's current sort settings and
 // rebuilds the list's items to match, in place. It does not touch the
-// cursor -- callers decide what that means for them (WithFiles resets it
-// to the top for a new directory; resort below keeps it on the same file).
+// cursor -- WithFiles preserves it for same-directory reloads and resets it
+// on navigation; resort below keeps it on the same file after reordering.
 //
 // The returned command must be run: with filtering enabled (#31), the list
 // needs it to rebuild the filtered view against the resorted items, or
@@ -611,6 +656,11 @@ func (p Panel) Update(msg tea.Msg) (Panel, tea.Cmd) {
 
 	var cmd tea.Cmd
 	p.list, cmd = p.list.Update(msg)
+	if _, ok := msg.(list.FilterMatchesMsg); ok && p.restoreSelectionPending {
+		p = p.restoreCursor(p.restoreSelectionName, p.restoreSelectionIndex)
+		p.restoreSelectionPending = false
+		p.restoreSelectionName = ""
+	}
 	return p, cmd
 }
 
@@ -764,6 +814,26 @@ func sizeDiffers(files, other []model.FileInfo) map[string]bool {
 		}
 	}
 	return differs
+}
+
+type panelFilterMatchesMsg struct {
+	Panel   string
+	Matches list.FilterMatchesMsg
+}
+
+// panelFilterCommand tags list filtering results so a background reload updates
+// its originating panel even if focus has moved before the command completes.
+func panelFilterCommand(panel string, cmd tea.Cmd) tea.Cmd {
+	if cmd == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg := cmd()
+		if matches, ok := msg.(list.FilterMatchesMsg); ok {
+			return panelFilterMatchesMsg{Panel: panel, Matches: matches}
+		}
+		return msg
+	}
 }
 
 type NavigateMsg struct {

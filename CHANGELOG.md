@@ -18,6 +18,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - After connecting, the Remote panel opens at the server-reported login working directory, usually
   the remote user's home, instead of always starting at `/`.
 
+### Fixed
+
+- Same-directory panel reloads preserve the cursor on the selected filename, including after a
+  transfer completes. Marked files continue to clear on reload.
+
 ## [0.3.1] - 2026-09-07
 
 Two Windows-consistency fixes and two layout/discoverability fixes, found in a post-release

@@ -279,6 +279,37 @@ func TestConnectionFallsBackToRootWhenInitialDirectoryCannotBeResolved(t *testin
 	}
 }
 
+func TestBackgroundRemoteReloadRestoresFilteredSelectionOnRemotePanel(t *testing.T) {
+	files := []model.FileInfo{{Name: "apple.txt"}, {Name: "apricot.txt"}, {Name: "banana.txt"}}
+	remote, _ := NewPanel("Remote", false).WithFiles(files, "/home/alice")
+	remote, cmd := remote.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	remote = runFilterCmd(remote, cmd)
+	remote, cmd = remote.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	remote = runFilterCmd(remote, cmd)
+	for i, item := range remote.list.VisibleItems() {
+		if item.(fileItem).file.Name == "apricot.txt" {
+			remote.list.Select(i)
+		}
+	}
+
+	a := NewApp(nil, false, nil, "dev", false)
+	a.focus = focusLocal
+	a.remote = remote
+	files = []model.FileInfo{{Name: "aardvark.txt"}, {Name: "apple.txt"}, {Name: "apricot.txt"}, {Name: "banana.txt"}}
+	model, cmd := a.Update(RemoteDirLoadedMsg{Files: files, Path: "/home/alice"})
+	a = model.(App)
+	if cmd == nil {
+		t.Fatal("filtered remote reload returned no filter command")
+	}
+	model, _ = a.Update(cmd())
+	a = model.(App)
+
+	item, ok := a.remote.list.SelectedItem().(fileItem)
+	if !ok || item.file.Name != "apricot.txt" {
+		t.Errorf("remote cursor after background reload = %+v, want apricot.txt", item.file)
+	}
+}
+
 // U/D transfer whichever side has marked files, regardless of focus. With
 // nothing marked there's no file to infer, so they must not silently no-op.
 func TestDirectTransferKeysRequireMarkedFiles(t *testing.T) {

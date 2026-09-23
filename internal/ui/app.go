@@ -544,14 +544,22 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.local, filterCmd = a.local.WithFiles(msg.Files, msg.Path)
 		_, panelH, _ := a.heights()
 		a.local = a.local.SetSize(a.panelWidth(), panelH)
-		return a, filterCmd
+		return a, panelFilterCommand("Local", filterCmd)
 
 	case RemoteDirLoadedMsg:
 		var filterCmd tea.Cmd
 		a.remote, filterCmd = a.remote.WithFiles(msg.Files, msg.Path)
 		_, panelH, _ := a.heights()
 		a.remote = a.remote.SetSize(a.panelWidth(), panelH)
-		return a, filterCmd
+		return a, panelFilterCommand("Remote", filterCmd)
+
+	case panelFilterMatchesMsg:
+		if msg.Panel == "Local" {
+			a.local, _ = a.local.Update(msg.Matches)
+		} else {
+			a.remote, _ = a.remote.Update(msg.Matches)
+		}
+		return a, nil
 
 	case TransferDoneMsg:
 		return a.handleTransferDone(msg)

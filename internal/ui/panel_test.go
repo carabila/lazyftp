@@ -804,6 +804,65 @@ func TestReloadWhileFilteredKeepsMatchingItemsVisible(t *testing.T) {
 	}
 }
 
+func TestReloadingSameDirectoryKeepsCursorOnTheSameFileAndClearsMarks(t *testing.T) {
+	files := []model.FileInfo{{Name: "alpha.txt"}, {Name: "bravo.txt"}, {Name: "charlie.txt"}}
+	p, _ := NewPanel("Local", true).WithFiles(files, "/tmp")
+	p.list.Select(1)
+	p.marked["bravo.txt"] = true
+
+	reloaded := []model.FileInfo{
+		{Name: "aardvark.txt"},
+		{Name: "alpha.txt"},
+		{Name: "bravo.txt"},
+		{Name: "charlie.txt"},
+	}
+	p, cmd := p.WithFiles(reloaded, "/tmp")
+	p = runFilterCmd(p, cmd)
+
+	item, ok := p.list.SelectedItem().(fileItem)
+	if !ok || item.file.Name != "bravo.txt" {
+		t.Errorf("selection after same-directory reload = %+v, want bravo.txt", item.file)
+	}
+	if len(p.markedFiles()) != 0 {
+		t.Errorf("reload retained marked files: %#v", p.markedFiles())
+	}
+}
+
+func TestReloadingDifferentDirectoryStartsAtTop(t *testing.T) {
+	p, _ := NewPanel("Local", true).WithFiles([]model.FileInfo{{Name: "a.txt"}, {Name: "b.txt"}}, "/tmp/one")
+	p.list.Select(1)
+
+	p, cmd := p.WithFiles([]model.FileInfo{{Name: "a.txt"}, {Name: "b.txt"}}, "/tmp/two")
+	p = runFilterCmd(p, cmd)
+	item, ok := p.list.SelectedItem().(fileItem)
+	if !ok || item.file.Name != "a.txt" {
+		t.Errorf("selection after directory change = %+v, want first item a.txt", item.file)
+	}
+}
+
+func TestReloadWhileFilteredKeepsCursorOnTheSameFile(t *testing.T) {
+	files := []model.FileInfo{{Name: "apple.txt"}, {Name: "apricot.txt"}, {Name: "banana.txt"}}
+	p, _ := NewPanel("Local", true).WithFiles(files, "/tmp")
+	p, cmd := p.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	p = runFilterCmd(p, cmd)
+	p, cmd = p.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	p = runFilterCmd(p, cmd)
+
+	for i, item := range p.list.VisibleItems() {
+		if item.(fileItem).file.Name == "apricot.txt" {
+			p.list.Select(i)
+		}
+	}
+
+	reloaded := []model.FileInfo{{Name: "aardvark.txt"}, {Name: "apple.txt"}, {Name: "apricot.txt"}, {Name: "banana.txt"}}
+	p, cmd = p.WithFiles(reloaded, "/tmp")
+	p = runFilterCmd(p, cmd)
+	item, ok := p.list.SelectedItem().(fileItem)
+	if !ok || item.file.Name != "apricot.txt" {
+		t.Errorf("selection after filtered reload = %+v, want apricot.txt", item.file)
+	}
+}
+
 func TestToggleHiddenFilesShowsAndHidesDotfiles(t *testing.T) {
 	files := []model.FileInfo{
 		{Name: "visible.txt"},
