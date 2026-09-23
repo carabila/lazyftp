@@ -20,15 +20,26 @@ import (
 // stubClient stands in for a server. Only Disconnect is observed: abandoning an
 // attempt has to close whatever the attempt opened.
 type stubClient struct {
-	disconnected bool
+	disconnected  bool
+	initialDir    string
+	initialDirErr error
 }
 
-func (s *stubClient) Connect(host, user, pass string, port int) error { return nil }
-func (s *stubClient) Disconnect() error                               { s.disconnected = true; return nil }
-func (s *stubClient) List(path string) ([]model.FileInfo, error)      { return nil, nil }
-func (s *stubClient) Mkdir(path string) error                         { return nil }
-func (s *stubClient) Rename(oldPath, newPath string) error            { return nil }
-func (s *stubClient) Delete(path string, isDir bool) error            { return nil }
+func (s *stubClient) Connect(options client.ConnectionOptions) error { return nil }
+func (s *stubClient) Disconnect() error                              { s.disconnected = true; return nil }
+func (s *stubClient) InitialDir() (string, error) {
+	if s.initialDirErr != nil {
+		return s.initialDir, s.initialDirErr
+	}
+	if s.initialDir == "" {
+		return "/", nil
+	}
+	return s.initialDir, nil
+}
+func (s *stubClient) List(path string) ([]model.FileInfo, error) { return nil, nil }
+func (s *stubClient) Mkdir(path string) error                    { return nil }
+func (s *stubClient) Rename(oldPath, newPath string) error       { return nil }
+func (s *stubClient) Delete(path string, isDir bool) error       { return nil }
 func (s *stubClient) Upload(local, remote string, p func(int64)) error {
 	return nil
 }
@@ -73,10 +84,10 @@ func TestCtrlCQuitsFromEveryFocusState(t *testing.T) {
 	}
 }
 
-// Protocol (left/right only) and Port (digits only) take no free text, so
-// both have nothing to lose by also responding to q/Q, unlike Host/User/Pass.
+// Protocol, Auth, and Port take no free text, so q/Q can quit from those
+// fields without stealing input, unlike Host, User, password, and key fields.
 func TestQuitsFromConnectionBarWhenNotTypingText(t *testing.T) {
-	for _, field := range []connField{fieldProtocol, fieldPort} {
+	for _, field := range []connField{fieldProtocol, fieldPort, fieldAuth} {
 		a := NewApp(nil, false, nil, "dev", false)
 		a.focus = focusConnectionBar
 		a.connBar.focused = field
@@ -91,10 +102,10 @@ func TestQuitsFromConnectionBarWhenNotTypingText(t *testing.T) {
 	}
 }
 
-// Host/User/Pass are free text -- a hostname or username can legitimately
-// contain "q", so it must reach the input, not quit.
+// Connection text fields accept free text -- a hostname, path, or passphrase
+// can legitimately contain "q", so it must reach the input, not quit.
 func TestQDoesNotQuitWhileTypingInAConnectionBarField(t *testing.T) {
-	for _, field := range []connField{fieldHost, fieldUser, fieldPass} {
+	for _, field := range []connField{fieldHost, fieldUser, fieldPass, fieldIdentity, fieldKeyPassphrase} {
 		a := NewApp(nil, false, nil, "dev", false)
 		a.focus = focusConnectionBar
 		a.connBar.focused = field
@@ -120,6 +131,63 @@ func TestEscAbandonsAnAttemptInProgress(t *testing.T) {
 	}
 	if a.connectSeq == 1 {
 		t.Error("the attempt was not invalidated, so its result would still be taken")
+	}
+}
+
+func TestEscClosesIdentityPickerBeforeConnectionDialog(t *testing.T) {
+	a := NewApp(nil, false, nil, "dev", false)
+	a.focus = focusConnectionBar
+	a.connBar.picker = keyFilePicker{open: true}
+
+	model, _ := a.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	a = model.(App)
+
+	if a.focus != focusConnectionBar {
+		t.Error("Esc closed the connection dialog instead of returning to it")
+	}
+	if a.connBar.picker.open {
+		t.Error("Esc did not close the identity picker")
+	}
+}
+
+func TestProfileShortcutOpensPickerFromFilePanels(t *testing.T) {
+	a := NewApp(nil, false, nil, "dev", false)
+	a.focus = focusLocal
+	a.connBar = a.connBar.withProfilesLoaded(profilesLoadedMsg{})
+
+	model, _ := a.Update(tea.KeyPressMsg{Code: 'p', Mod: tea.ModCtrl})
+	a = model.(App)
+	if a.focus != focusConnectionBar || !a.connBar.profilePicker.open {
+		t.Error("Ctrl+P from a file panel did not open the profile picker")
+	}
+}
+
+func TestProfilePickerOwnsKeysUntilClosed(t *testing.T) {
+	a := NewApp(nil, false, nil, "dev", false)
+	a.focus = focusConnectionBar
+	a.connBar = a.connBar.withProfilesLoaded(profilesLoadedMsg{})
+
+	model, _ := a.Update(tea.KeyPressMsg{Code: 'p', Mod: tea.ModCtrl})
+	a = model.(App)
+	if !a.connBar.profilePicker.open {
+		t.Fatal("Ctrl+P did not open the saved-profile picker")
+	}
+
+	model, cmd := a.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	a = model.(App)
+	if cmd != nil {
+		if _, quits := cmd().(tea.QuitMsg); quits {
+			t.Fatal("q quit the app instead of being swallowed by the picker")
+		}
+	}
+	if !a.connBar.profilePicker.open {
+		t.Fatal("q closed the profile picker")
+	}
+
+	model, _ = a.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	a = model.(App)
+	if a.connBar.profilePicker.open || a.focus != focusConnectionBar {
+		t.Error("Esc should close only the profile picker")
 	}
 }
 
@@ -176,6 +244,38 @@ func TestACurrentAttemptStillConnects(t *testing.T) {
 	}
 	if stub.disconnected {
 		t.Error("a current attempt was disconnected")
+	}
+}
+
+func TestConnectionLoadsTheServerReportedInitialDirectory(t *testing.T) {
+	a := NewApp(nil, false, nil, "dev", false)
+	stub := &stubClient{initialDir: "/home/alice"}
+
+	a, cmd := a.handleConnected(connectedMsg{seq: 0, client: stub, addr: "example.org:22", user: "alice", protocol: client.SFTP})
+	if !a.connected {
+		t.Fatal("the app did not mark the client as connected")
+	}
+	result := cmd()
+	loaded, ok := result.(RemoteDirLoadedMsg)
+	if !ok {
+		t.Fatalf("initial directory command returned %T, want RemoteDirLoadedMsg", result)
+	}
+	if loaded.Path != "/home/alice" {
+		t.Errorf("initial remote path = %q, want the server working directory", loaded.Path)
+	}
+}
+
+func TestConnectionFallsBackToRootWhenInitialDirectoryCannotBeResolved(t *testing.T) {
+	a := NewApp(nil, false, nil, "dev", false)
+	stub := &stubClient{initialDir: "/", initialDirErr: errors.New("REALPATH unavailable")}
+
+	a, cmd := a.handleConnected(connectedMsg{seq: 0, client: stub, addr: "example.org:22", user: "alice", protocol: client.SFTP})
+	loaded := cmd().(RemoteDirLoadedMsg)
+	if loaded.Path != "/" {
+		t.Errorf("fallback remote path = %q, want /", loaded.Path)
+	}
+	if n := len(a.log.entries); n == 0 || !strings.Contains(a.log.entries[n-1].Message, "opening /") {
+		t.Errorf("fallback was not logged: %#v", a.log.entries)
 	}
 }
 

@@ -37,7 +37,8 @@ from the keyboard.
 
 ## Features
 
-- FTP, FTPS and SFTP support
+- FTP, FTPS and SFTP support, including SFTP password or SSH identity-file authentication
+- Named connection profiles, including saved server passwords for quick reconnects
 - Dual-pane layout — local and remote side by side, responsive down to an 80x24 terminal
 - File size and modification date, sortable by name, size or date, with the exact byte count and
   full timestamp a keystroke away when the panel is too narrow to show them
@@ -116,12 +117,33 @@ Press `Ctrl+L` to open the connection dialog:
 |-------|-------------|
 | Proto | `FTP`, `FTPS` or `SFTP` — cycle with `←` / `→` |
 | Host | Server hostname or IP |
-| User | Username |
-| Pass | Password |
 | Port | Leave empty for the protocol's default: `21` for FTP and FTPS, `22` for SFTP |
+| User | Username |
+| Auth | SFTP only: choose **Password** or **Identity file** with `←` / `→` |
+| Pass | FTP/FTPS password, or SFTP password when Password mode is selected |
+| Identity | SFTP Identity file mode: path to your private key, such as `~/.ssh/id_ed25519` |
+| Key pass | Passphrase for an encrypted identity file; masked and optional for unencrypted keys |
+
+In the SFTP dialog, use the **Auth** field to switch between password and identity-file login.
+On the Identity field, press `Ctrl+O` to browse local files; you can also type a path directly.
+The picker starts in `~/.ssh` when that directory exists, otherwise in your home directory. Use
+`↑`/`↓` to move, `Enter` to open a directory or choose a file, `Backspace` to go to its parent,
+and `Esc` to return to the form.
+Passphrases for encrypted keys are entered in the masked Key pass field. lazyftp reads the
+identity file locally and does not log or save its contents.
+
+After login, the Remote panel opens in the server-reported working directory, which is usually the
+remote user's home. A chrooted or virtual SFTP server may report its visible root instead.
 
 Press `Enter` to connect, `Esc` to close the dialog or give up on an attempt that is taking too
 long. Once connected, the status line shows the protocol, user, host and connection state.
+
+Saved connections can be selected from anywhere with `Ctrl+P`; choosing one fills in the
+connection dialog, where `Enter` connects. Open the dialog with `Ctrl+L` and use `Ctrl+S` to save
+the current settings. Profiles live in `~/.lazyftp/config.json`. Server passwords are stored there
+in plaintext; on POSIX systems the directory and file are restricted to the owner (`0700` and
+`0600`). Windows relies on the ACL of your home directory. SSH key passphrases are never saved.
+Identity-file profiles remember only the key path.
 
 FTPS certificates are verified, so a server with a self-signed certificate is refused.
 
@@ -147,6 +169,7 @@ press `?`.
 | Key | Action |
 |-----|--------|
 | `Ctrl+L` | Open the connection dialog |
+| `Ctrl+P` | Choose a saved profile |
 | `?` | Help screen |
 | `Tab` | Switch panel within the current group (Local/Remote, or Log/Processes) |
 | `Shift+Tab` | Switch between the Local/Remote group and the Log/Processes group |
@@ -185,16 +208,31 @@ press `?`.
 |-----|--------|
 | `Tab` | Next field |
 | `Shift+Tab` | Previous field |
-| `←` / `→` | Change protocol (on the Proto field) |
+| `←` / `→` | Change protocol or SFTP authentication mode (on the corresponding field) |
+| `Ctrl+O` | Browse for an identity file (on the Identity field) |
+| `Ctrl+S` | Save or update a profile |
 | `Enter` | Connect |
 | `Esc` | Close, or abandon an attempt in progress |
+
+### Identity file picker
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k`, `↓` / `j` | Move through entries |
+| `Enter` | Open a directory or select a file |
+| `Backspace` / `←` | Go to the parent directory |
+| `Esc` | Return to the connection dialog |
+
+In the profile picker, use `Enter` to load a profile, `d` then `y` to confirm deletion (`n` or
+`Esc` cancels), and `Ctrl+S` to save another. Saving an existing profile name asks for overwrite
+confirmation (`y` to replace, `n` to return to the name field).
 
 ---
 
 ## Troubleshooting
 
 **A connection fails and you want to know why.** Both flags together put the whole exchange in a
-file you can attach to an issue. Passwords are masked.
+file you can attach to an issue. Passwords and key passphrases are masked.
 
 ```bash
 lazyftp --verbose --log-file lazyftp.log
@@ -214,6 +252,7 @@ lazyftp/
 ├── docs/              Contributor documentation
 ├── internal/
 │   ├── client/        FTP, FTPS and SFTP behind one interface
+│   ├── config/        Versioned saved connection profiles
 │   ├── model/         FileInfo — one entry in a listing, local or remote
 │   ├── shared/        Messages and progress wrappers used across packages
 │   ├── transfer/      Uploads and downloads, running in the background

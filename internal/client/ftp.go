@@ -19,10 +19,11 @@ import (
 )
 
 type FTPClient struct {
-	conn   *goftp.Client
-	host   string
-	logger io.Writer
-	tls    bool
+	conn       *goftp.Client
+	host       string
+	initialDir string
+	logger     io.Writer
+	tls        bool
 }
 
 // A nil logger disables logging.
@@ -35,19 +36,19 @@ func NewFTPSClient(logger io.Writer) *FTPClient {
 	return &FTPClient{logger: logger, tls: true}
 }
 
-func (c *FTPClient) Connect(host, user, pass string, port int) error {
-	c.host = fmt.Sprintf("%s:%d", host, port)
+func (c *FTPClient) Connect(options ConnectionOptions) error {
+	c.host = fmt.Sprintf("%s:%d", options.Host, options.Port)
 
 	config := goftp.Config{
-		User:     user,
-		Password: pass,
+		User:     options.User,
+		Password: options.Password,
 		Timeout:  dialTimeout,
 		Logger:   c.logger,
 	}
 
 	if c.tls {
 		// Certificates are verified; a self-signed one fails here.
-		config.TLSConfig = &tls.Config{ServerName: host}
+		config.TLSConfig = &tls.Config{ServerName: options.Host}
 	}
 
 	conn, err := goftp.DialConfig(config, c.host)
@@ -56,7 +57,8 @@ func (c *FTPClient) Connect(host, user, pass string, port int) error {
 	}
 
 	// DialConfig only builds a pool; nothing has reached the server yet.
-	if _, err := conn.Getwd(); err != nil {
+	initialDir, err := conn.Getwd()
+	if err != nil {
 		conn.Close()
 		if c.tls {
 			// A server without TLS refuses AUTH TLS with the same 530 it gives
@@ -67,6 +69,10 @@ func (c *FTPClient) Connect(host, user, pass string, port int) error {
 	}
 
 	c.conn = conn
+	c.initialDir = initialDir
+	if c.initialDir == "" {
+		c.initialDir = "/"
+	}
 	return nil
 }
 
@@ -75,6 +81,13 @@ func (c *FTPClient) Disconnect() error {
 		return nil
 	}
 	return c.conn.Close()
+}
+
+func (c *FTPClient) InitialDir() (string, error) {
+	if c.conn == nil {
+		return "", fmt.Errorf("no active connection")
+	}
+	return c.initialDir, nil
 }
 
 func (c *FTPClient) List(path string) ([]model.FileInfo, error) {

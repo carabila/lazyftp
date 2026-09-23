@@ -53,12 +53,13 @@ Requires extending the client interface with rename and remove operations.
 
 ## v0.4.0 — Connections and authentication
 
-- [#36](https://github.com/MawCeron/lazyftp/issues/36) **Configuration layer** — the shared foundation for saved connections, history,
-  bookmarks and themes. Credentials policy: **no plaintext passwords**.
-- [#4](https://github.com/MawCeron/lazyftp/issues/4) Save and manage favorite connections
+- [#36](https://github.com/MawCeron/lazyftp/issues/36) **Configuration layer** — named connection profiles are stored in
+  `~/.lazyftp/config.json`; server passwords are plaintext but the file is restricted to the user on POSIX systems.
+  SSH key passphrases are not stored. Connection history, bookmarks and themes remain future work.
+- [#4](https://github.com/MawCeron/lazyftp/issues/4) Extend profile management with additional favorite-connection workflows
 - [#3](https://github.com/MawCeron/lazyftp/issues/3) Connection history with quick reconnect
-- [#37](https://github.com/MawCeron/lazyftp/issues/37) **SSH key and ssh-agent authentication.** Password auth is the only option today,
-  so key-only servers cannot be reached at all.
+- [#37](https://github.com/MawCeron/lazyftp/issues/37) **SSH-agent authentication** is deferred. SFTP identity-file
+  authentication, including passphrase-protected keys, is available alongside password auth.
 - [#38](https://github.com/MawCeron/lazyftp/issues/38) **Host key verification**, removing the current accept-anything placeholder.
 - [#53](https://github.com/MawCeron/lazyftp/issues/53) **Read connections from `~/.ssh/config`** — servers the user already maintains for
   `ssh` and `scp`, available with nothing to configure. Suggested by a user in #4.

@@ -67,12 +67,25 @@ var (
 	keyDeleteCancel  = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
 
 	// Connection dialog.
-	keyNextField    = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field"))
-	keyPrevField    = key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev field"))
-	keyProtocolPrev = key.NewBinding(key.WithKeys("left"))
-	keyProtocolNext = key.NewBinding(key.WithKeys("right", "space"))
-	keyProtocol     = key.NewBinding(key.WithKeys("left", "right"), key.WithHelp("←/→", "protocol")) // display only
-	keySubmit       = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "connect"))
+	keyNextField          = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field"))
+	keyPrevField          = key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev field"))
+	keySelectorPrev       = key.NewBinding(key.WithKeys("left"))
+	keySelectorNext       = key.NewBinding(key.WithKeys("right", "space"))
+	keySelector           = key.NewBinding(key.WithKeys("left", "right"), key.WithHelp("←/→", "protocol/auth")) // display only
+	keySubmit             = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "connect"))
+	keyBrowseIdentity     = key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "browse keys"))
+	keyProfiles           = key.NewBinding(key.WithKeys("ctrl+p"), key.WithHelp("ctrl+p", "profiles"))
+	keySaveProfile        = key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "save profile"))
+	keySaveProfileConfirm = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save"))
+	keyDeleteProfile      = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete"))
+	keyProfileConfirm     = key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "confirm"))
+	keyProfileDecline     = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel"))
+	keyProfileCancel      = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
+	keyPickerUp           = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
+	keyPickerDown         = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
+	keyPickerParent       = key.NewBinding(key.WithKeys("backspace", "left"), key.WithHelp("backspace", "parent"))
+	keyPickerSelect       = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open/select"))
+	keyPickerCancel       = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
 
 	// esc means something different per context (abandon a connection
 	// attempt, close the dialog, close help), so matching uses one shared
@@ -87,14 +100,20 @@ var (
 // footerKeyMap drives the always-visible footer: only what's actionable
 // from where the user is right now, never the full reference — that's ?.
 type footerKeyMap struct {
-	focus        focus
-	connecting   bool
-	helpOpen     bool
-	fileInfoOpen bool
-	jumping      bool
-	creatingDir  bool
-	renaming     bool
-	deleting     bool
+	focus                focus
+	connecting           bool
+	helpOpen             bool
+	fileInfoOpen         bool
+	jumping              bool
+	creatingDir          bool
+	renaming             bool
+	deleting             bool
+	keyPickerOpen        bool
+	profilePickerOpen    bool
+	profileSaveOpen      bool
+	profileDeleteConfirm bool
+	profileOverwrite     bool
+	identityFieldFocused bool
 }
 
 func (k footerKeyMap) ShortHelp() []key.Binding {
@@ -113,13 +132,27 @@ func (k footerKeyMap) ShortHelp() []key.Binding {
 		return []key.Binding{keyRenameConfirm, keyRenameCancel}
 	case k.deleting:
 		return []key.Binding{keyDeleteConfirm, keyDeleteCancel}
+	case k.keyPickerOpen:
+		return []key.Binding{keyPickerUp, keyPickerDown, keyPickerSelect, keyPickerParent, keyPickerCancel}
+	case k.profilePickerOpen && k.profileDeleteConfirm:
+		return []key.Binding{keyProfileConfirm, keyProfileDecline, keyProfileCancel}
+	case k.profilePickerOpen:
+		return []key.Binding{keyPickerUp, keyPickerDown, keyPickerSelect, keyDeleteProfile, keySaveProfile, keyProfileCancel}
+	case k.profileSaveOpen && k.profileOverwrite:
+		return []key.Binding{keyProfileConfirm, keyProfileDecline}
+	case k.profileSaveOpen:
+		return []key.Binding{keySaveProfileConfirm, keyProfileCancel}
 	case k.focus == focusConnectionBar:
-		return []key.Binding{keyNextField, keyPrevField, keyProtocol, keySubmit, keyCancelConnection}
+		bindings := []key.Binding{keyNextField, keyPrevField, keySelector, keySubmit, keyProfiles, keySaveProfile}
+		if k.identityFieldFocused {
+			bindings = append(bindings, keyBrowseIdentity)
+		}
+		return append(bindings, keyCancelConnection)
 	case k.focus == focusLog || k.focus == focusProcesses:
 		up, down, pageUp, pageDown := scrollKeys()
-		return []key.Binding{up, down, pageUp, pageDown, keySwitch}
+		return []key.Binding{up, down, pageUp, pageDown, keySwitch, keyProfiles}
 	default:
-		return []key.Binding{keyOpen, keyUp, keyMark, keyTransfer, keyHelp}
+		return []key.Binding{keyOpen, keyUp, keyMark, keyTransfer, keyHelp, keyProfiles}
 	}
 }
 
@@ -127,14 +160,16 @@ func (footerKeyMap) FullHelp() [][]key.Binding { return nil }
 
 // helpGroups is the complete reference the help screen renders, grouped by
 // context; helpGroupTitles names each group in the same order.
-var helpGroupTitles = []string{"Global", "File panels", "Log & Processes", "Connection dialog"}
+var helpGroupTitles = []string{"Global", "File panels", "Log & Processes", "Connection dialog", "Identity file picker", "Saved profiles"}
 
 func helpGroups() [][]key.Binding {
 	up, down, pageUp, pageDown := scrollKeys()
 	return [][]key.Binding{
-		{keyQuit, keyHelp, keyConnect, keySwitch, keySwitchZone, keyUpload, keyDownload},
+		{keyQuit, keyHelp, keyConnect, keyProfiles, keySwitch, keySwitchZone, keyUpload, keyDownload},
 		{keyOpen, keyUp, keyMark, keyTransfer, keyRefresh, keySortNext, keySortFlip, keyJump, keyToggleHidden, keyMkdir, keyRename, keyDelete},
 		{up, down, pageUp, pageDown},
-		{keyNextField, keyPrevField, keyProtocol, keySubmit, keyCancelConnection},
+		{keyNextField, keyPrevField, keySelector, keySubmit, keyBrowseIdentity, keySaveProfile, keyCancelConnection},
+		{keyPickerUp, keyPickerDown, keyPickerSelect, keyPickerParent, keyPickerCancel},
+		{keyPickerUp, keyPickerDown, keyPickerSelect, keyDeleteProfile, keyProfileConfirm, keyProfileDecline, keySaveProfile, keyProfileCancel},
 	}
 }

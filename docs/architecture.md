@@ -12,16 +12,16 @@ like, where this covers where it goes.
 ## The shape of the program
 
 lazyftp moves files between the local machine and a server, from the keyboard. It is a single
-binary with no configuration file, no daemon and no state on disk. Everything it knows lives in
-memory for as long as it runs.
+binary with no daemon; named connection profiles are the only persistent application state.
 
-Five packages, all under `internal/` because none of them is meant to be imported by anything
+Six packages, all under `internal/` because none of them is meant to be imported by anything
 else:
 
 | Package | Holds | Depends on |
 |---|---|---|
-| `ui` | The screen and every keystroke. The `App` model, the panels, the connection bar | `client`, `transfer`, `model`, `shared` |
+| `ui` | The screen and every keystroke. The `App` model, the panels, the connection bar | `client`, `config`, `transfer`, `model`, `shared` |
 | `client` | Reaching servers. The `Client` interface and its FTP/FTPS and SFTP implementations | `model`, `shared` |
+| `config` | Versioned saved-connection profile file and its permission-restricted atomic writes | nothing |
 | `transfer` | Running uploads and downloads in the background, reporting progress | `client`, `model`, `shared` |
 | `model` | `FileInfo` — one entry in a listing, local or remote, with the same shape either way | nothing |
 | `shared` | Types that would otherwise cause an import cycle: messages, the progress wrappers, `LineBuffer` | nothing |
@@ -42,7 +42,8 @@ browser used for both sides. `connectionbar.go` is the form at the top. `process
 
 Inside `client`, `client.go` declares the interface and the dial timeout, `protocol.go` holds the
 protocol type and the factory, and `ftp.go` and `sftp.go` are the two implementations at roughly
-two hundred lines each.
+two hundred lines each. `internal/config/config.go` owns the versioned JSON profile format and
+writes it atomically outside the UI update loop.
 
 ### Where to make a change
 
@@ -179,9 +180,10 @@ abandoned attempt from connecting the application after the user has moved on.
 Everything that reaches a server goes through one interface, `client.Client` in
 `internal/client/client.go`. It declares what lazyftp needs a server to do — connect and
 disconnect, list a directory, upload, download, make a directory, rename, delete — and nothing
-else. Paths are plain strings, listings come back as `[]model.FileInfo`, and progress is reported
-through a
-`func(int64)` callback that fires as bytes move.
+else. `Connect` takes a `ConnectionOptions` value so protocol-specific authentication can be added
+without growing a positional-argument list. Paths are plain strings, listings come back as
+`[]model.FileInfo`, and progress is reported through a `func(int64)` callback that fires as bytes
+move.
 
 Two types implement it. `FTPClient` speaks FTP and FTPS, which are the same protocol with TLS
 negotiated on top, so one type covers both with a `tls` field deciding whether to negotiate.
@@ -266,6 +268,17 @@ SSH handshake but never answers the `sftp` subsystem request would hang the same
 `sftp.NewClient` has actually finished negotiating the subsystem — covering both handshakes, not
 just the first — left in place any longer it would expire in the middle of a transfer.
 
+SFTP authentication is selected explicitly in `ConnectionOptions`: password mode uses
+`ssh.Password`, while identity-file mode reads the local key and uses `ssh.PublicKeys`. Encrypted
+private keys are parsed with the supplied key passphrase; the app never silently falls back to the
+server password. The UI's local file picker is asynchronous so filesystem reads do not block the
+Bubble Tea update loop.
+
+After connecting, both clients expose `InitialDir`: FTP records the server's `PWD`, and SFTP asks
+`REALPATH` for the current directory. This is normally the remote user's home, but a chrooted or
+virtual server may report its visible root. If SFTP cannot resolve it, the app logs the issue and
+falls back to `/` rather than rejecting an otherwise usable connection.
+
 Addresses are assembled with `net.JoinHostPort`. `fmt.Sprintf("%s:%d", …)` produces something
 unusable for IPv6 hosts, and `go vet` will tell you so.
 
@@ -328,10 +341,17 @@ the loop keeps whatever `Update` returned rather than whatever you modified.
 Defects that exist today, listed because building on top of one is expensive to undo. Each has an
 issue; when it is fixed, its entry here goes with it.
 
+**Saved server passwords are plaintext.** Profiles include passwords in `~/.lazyftp/config.json`
+so a selected profile can reconnect without prompting. On POSIX systems the directory and file are
+restricted to the owner (`0700` and `0600`); Windows relies on the user's home-directory ACL.
+Private-key passphrases are not saved. Backups or copies of the config may still expose server
+passwords.
+
 **SSH host keys are not verified.** `SFTPClient.Connect` uses `ssh.InsecureIgnoreHostKey()`, so
-lazyftp connects to whatever answers and never warns that the key changed. Password authentication
-over an unverified connection is exactly the shape a machine-in-the-middle needs. Documented rather
-than buried because a user should be able to find it out before trusting it with a password.
+lazyftp connects to whatever answers and never warns that the key changed. This affects both
+password and identity-file authentication; key authentication does not establish that the server
+is the one the user intended to reach. Documented rather than buried because a user should be able
+to find it out before trusting it with credentials.
 ([#38](https://github.com/MawCeron/lazyftp/issues/38))
 
 **Transfers are unbounded and cannot be stopped.** `Manager.Enqueue` starts one goroutine per job

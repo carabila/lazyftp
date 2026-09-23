@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -8,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MawCeron/lazyftp/internal/model"
@@ -17,26 +19,83 @@ import (
 )
 
 type SFTPClient struct {
-	sshConn *ssh.Client
-	client  *sftp.Client
+	sshConn       *ssh.Client
+	client        *sftp.Client
+	initialDir    string
+	initialDirErr error
 }
 
 func NewSFTPClient() *SFTPClient {
 	return &SFTPClient{}
 }
 
-func (c *SFTPClient) Connect(host, user, pass string, port int) error {
+func sftpAuth(options ConnectionOptions) (ssh.AuthMethod, error) {
+	switch options.SFTPAuth {
+	case SFTPAuthPassword:
+		return ssh.Password(options.Password), nil
+	case SFTPAuthIdentityFile:
+		identityPath, err := resolveIdentityPath(options.IdentityFile)
+		if err != nil {
+			return nil, err
+		}
+
+		key, err := os.ReadFile(identityPath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read identity file %q: %w", identityPath, err)
+		}
+
+		signer, err := ssh.ParsePrivateKey(key)
+		var passphraseMissing *ssh.PassphraseMissingError
+		if errors.As(err, &passphraseMissing) {
+			if options.KeyPassphrase == "" {
+				return nil, fmt.Errorf("identity file %q requires a passphrase", identityPath)
+			}
+			signer, err = ssh.ParsePrivateKeyWithPassphrase(key, []byte(options.KeyPassphrase))
+		}
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse identity file %q: %w", identityPath, err)
+		}
+		return ssh.PublicKeys(signer), nil
+	default:
+		return nil, fmt.Errorf("unsupported SFTP authentication method %d", options.SFTPAuth)
+	}
+}
+
+func resolveIdentityPath(identityPath string) (string, error) {
+	if identityPath == "" {
+		return "", fmt.Errorf("identity file path is empty")
+	}
+
+	if identityPath == "~" || strings.HasPrefix(identityPath, "~/") || strings.HasPrefix(identityPath, "~\\") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("unable to resolve home directory for identity file: %w", err)
+		}
+		if identityPath == "~" {
+			identityPath = home
+		} else {
+			identityPath = filepath.Join(home, identityPath[2:])
+		}
+	}
+
+	return filepath.Clean(identityPath), nil
+}
+
+func (c *SFTPClient) Connect(options ConnectionOptions) error {
+	auth, err := sftpAuth(options)
+	if err != nil {
+		return err
+	}
+
 	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(pass),
-		},
+		User: options.User,
+		Auth: []ssh.AuthMethod{auth},
 		// TODO: verificar host key en versiones futuras
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         dialTimeout,
 	}
 
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	addr := net.JoinHostPort(options.Host, strconv.Itoa(options.Port))
 
 	// ssh.Dial bounds the TCP dial only. A host that accepts without speaking
 	// SSH leaves the handshake waiting with nothing to end it.
@@ -63,12 +122,30 @@ func (c *SFTPClient) Connect(host, user, pass string, port int) error {
 		return fmt.Errorf("error starting SFTP session: %w", err)
 	}
 
+	initialDir, initialDirErr := client.Getwd()
+	if initialDirErr == nil && initialDir == "" {
+		initialDirErr = fmt.Errorf("server returned an empty working directory")
+	}
+	if initialDirErr != nil {
+		initialDir = "/"
+		initialDirErr = fmt.Errorf("unable to determine remote starting directory on %s: %w", addr, initialDirErr)
+	}
+
 	// Left in place the deadline would expire mid-transfer.
 	tcpConn.SetDeadline(time.Time{})
 
 	c.sshConn = sshConn
 	c.client = client
+	c.initialDir = initialDir
+	c.initialDirErr = initialDirErr
 	return nil
+}
+
+func (c *SFTPClient) InitialDir() (string, error) {
+	if c.client == nil {
+		return "", fmt.Errorf("no active connection")
+	}
+	return c.initialDir, c.initialDirErr
 }
 
 func (c *SFTPClient) Disconnect() error {

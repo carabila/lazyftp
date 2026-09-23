@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/MawCeron/lazyftp/internal/client"
 	"github.com/MawCeron/lazyftp/internal/model"
 )
 
@@ -54,8 +55,9 @@ type dirClient struct {
 	uploaded   []string
 }
 
-func (c *dirClient) Connect(string, string, string, int) error { return nil }
-func (c *dirClient) Disconnect() error                         { return nil }
+func (c *dirClient) Connect(client.ConnectionOptions) error { return nil }
+func (c *dirClient) Disconnect() error                      { return nil }
+func (c *dirClient) InitialDir() (string, error)            { return "/", nil }
 func (c *dirClient) List(path string) ([]model.FileInfo, error) {
 	return c.tree[path], nil
 }

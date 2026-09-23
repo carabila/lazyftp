@@ -10,9 +10,32 @@ import (
 // a dial waits out the operating system's TCP timeout instead.
 const dialTimeout = 10 * time.Second
 
+// SFTPAuthMethod selects how an SFTP connection authenticates.
+type SFTPAuthMethod int
+
+const (
+	SFTPAuthPassword SFTPAuthMethod = iota
+	SFTPAuthIdentityFile
+)
+
+// ConnectionOptions contains the fields needed to connect using a protocol.
+// Password is used by FTP/FTPS and SFTP password mode; the identity fields are
+// used only by SFTP identity-file mode.
+type ConnectionOptions struct {
+	Host          string
+	User          string
+	Password      string
+	Port          int
+	SFTPAuth      SFTPAuthMethod
+	IdentityFile  string
+	KeyPassphrase string
+}
+
 type Client interface {
-	Connect(host, user, pass string, port int) error
+	Connect(options ConnectionOptions) error
 	Disconnect() error
+	// InitialDir is the server-reported working directory established by login.
+	InitialDir() (string, error)
 	List(path string) ([]model.FileInfo, error)
 	Upload(localPath, remotePath string, progress func(int64)) error
 	Download(remotePath, localPath string, progress func(int64)) error

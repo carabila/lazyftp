@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -22,9 +24,7 @@ var (
 	right    = tea.KeyPressMsg{Code: tea.KeyRight}
 )
 
-// Tab order must match the visual layout (Protocol, Host, Port, User, Pass):
-// it used to follow the field enum's declaration order instead, so tabbing
-// from Host skipped over the visually-adjacent Port field.
+// The FTP form follows its visual order (Protocol, Host, Port, User, Pass).
 func TestTabFollowsVisualOrder(t *testing.T) {
 	bar := NewConnectionBar()
 	want := []connField{fieldHost, fieldPort, fieldUser, fieldPass, fieldProtocol}
@@ -44,14 +44,14 @@ func TestTabbingReachesEveryFieldAndWrapsAround(t *testing.T) {
 	bar := NewConnectionBar()
 	start := bar.focused
 
-	for i := 0; i < int(fieldCount); i++ {
+	for i := 0; i < len(bar.visibleFields()); i++ {
 		bar, _ = bar.Update(tab)
 	}
 	if bar.focused != start {
 		t.Errorf("a full cycle of tab ended on field %d, want %d", bar.focused, start)
 	}
 
-	for i := 0; i < int(fieldCount); i++ {
+	for i := 0; i < len(bar.visibleFields()); i++ {
 		bar, _ = bar.Update(shiftTab)
 	}
 	if bar.focused != start {
@@ -134,5 +134,142 @@ func TestPortOnlyAcceptsDigits(t *testing.T) {
 	bar, _ = bar.Update(backspace)
 	if got := bar.inputs[fieldPort].Value(); got != "2" {
 		t.Errorf("backspace should still edit the port field, got %q", got)
+	}
+}
+
+func TestSFTPAuthModeChangesVisibleFields(t *testing.T) {
+	bar := NewConnectionBar()
+	bar.protocol = client.SFTP
+
+	for _, field := range []connField{fieldHost, fieldPort, fieldUser, fieldAuth} {
+		bar, _ = bar.Update(tab)
+		if bar.focused != field {
+			t.Fatalf("tab reached field %d, want %d", bar.focused, field)
+		}
+	}
+	if bar.auth != client.SFTPAuthPassword {
+		t.Fatalf("default SFTP authentication is %d, want password", bar.auth)
+	}
+
+	bar, _ = bar.Update(right)
+	if bar.auth != client.SFTPAuthIdentityFile {
+		t.Fatal("right on the authentication selector did not choose identity-file auth")
+	}
+	bar, _ = bar.Update(tab)
+	if bar.focused != fieldIdentity {
+		t.Fatalf("the first identity-mode field is %d, want identity path", bar.focused)
+	}
+	bar, _ = bar.Update(tab)
+	if bar.focused != fieldKeyPassphrase {
+		t.Fatalf("the next identity-mode field is %d, want key passphrase", bar.focused)
+	}
+}
+
+func TestSubmittingIdentityModeIncludesKeyDetails(t *testing.T) {
+	bar := NewConnectionBar()
+	bar.protocol = client.SFTP
+	bar.auth = client.SFTPAuthIdentityFile
+	bar.inputs[fieldHost].SetValue("sftp.example.org")
+	bar.inputs[fieldUser].SetValue("alice")
+	bar.inputs[fieldIdentity].SetValue("~/.ssh/work")
+	bar.inputs[fieldKeyPassphrase].SetValue("secret")
+
+	_, cmd := bar.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("submitting the form returned no command")
+	}
+	result := cmd()
+	msg, ok := result.(ConnectMsg)
+	if !ok {
+		t.Fatalf("submit returned %T, want ConnectMsg", result)
+	}
+	if msg.Protocol != client.SFTP || msg.SFTPAuth != client.SFTPAuthIdentityFile {
+		t.Errorf("submitted protocol/auth = %s/%d, want SFTP/identity-file", msg.Protocol, msg.SFTPAuth)
+	}
+	if msg.IdentityFile != "~/.ssh/work" || msg.KeyPassphrase != "secret" {
+		t.Errorf("submitted identity details = %q/%q", msg.IdentityFile, msg.KeyPassphrase)
+	}
+}
+
+func TestIdentityPickerOpensInSSHDirectory(t *testing.T) {
+	home := t.TempDir()
+	sshDir := filepath.Join(home, ".ssh")
+	if err := os.Mkdir(sshDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sshDir, "id_ed25519"), []byte("key"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	bar := NewConnectionBar()
+	bar.protocol = client.SFTP
+	bar.auth = client.SFTPAuthIdentityFile
+	bar.focused = fieldIdentity
+	bar, cmd := bar.Update(tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl})
+	if !bar.picker.open {
+		t.Fatal("Ctrl+O did not open the identity picker")
+	}
+	if cmd == nil {
+		t.Fatal("opening the picker returned no directory-loading command")
+	}
+	bar, _ = bar.Update(cmd())
+	if len(bar.picker.entries) != 1 || bar.picker.entries[0].name != "id_ed25519" {
+		t.Fatalf("picker entries = %#v, want the identity file", bar.picker.entries)
+	}
+}
+
+func TestIdentityPickerFallsBackToHomeWhenSSHDirectoryIsMissing(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "identity"), []byte("key"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	bar := NewConnectionBar()
+	bar.protocol = client.SFTP
+	bar.auth = client.SFTPAuthIdentityFile
+	bar.focused = fieldIdentity
+	bar, cmd := bar.Update(tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl})
+	if cmd == nil {
+		t.Fatal("opening the picker returned no directory-loading command")
+	}
+	bar, _ = bar.Update(cmd())
+	if bar.picker.dir != home {
+		t.Errorf("picker opened in %q, want fallback home %q", bar.picker.dir, home)
+	}
+	if len(bar.picker.entries) != 1 || bar.picker.entries[0].name != "identity" {
+		t.Errorf("picker entries = %#v, want the home-directory identity", bar.picker.entries)
+	}
+}
+
+func TestIdentityPickerSelectsAFile(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(keyPath, []byte("key"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	picker := keyFilePicker{open: true, dir: dir, loading: true, seq: 1}
+	loaded := picker.load()().(keyFilePickerLoadedMsg)
+	picker = picker.withEntries(loaded)
+	if len(picker.entries) != 1 || picker.entries[0].name != "id_ed25519" {
+		t.Fatalf("picker entries = %#v, want the identity file", picker.entries)
+	}
+
+	bar := NewConnectionBar()
+	bar.protocol = client.SFTP
+	bar.auth = client.SFTPAuthIdentityFile
+	bar.focused = fieldIdentity
+	bar.picker = picker
+	bar, _ = bar.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if got := bar.inputs[fieldIdentity].Value(); got != keyPath {
+		t.Errorf("selected identity path = %q, want %q", got, keyPath)
+	}
+	if bar.picker.open {
+		t.Error("picker stayed open after selecting a file")
 	}
 }

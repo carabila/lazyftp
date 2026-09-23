@@ -16,6 +16,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/MawCeron/lazyftp/internal/client"
+	"github.com/MawCeron/lazyftp/internal/config"
 	"github.com/MawCeron/lazyftp/internal/model"
 	"github.com/MawCeron/lazyftp/internal/shared"
 	"github.com/MawCeron/lazyftp/internal/transfer"
@@ -123,7 +124,7 @@ func (a App) drainProtoLog() App {
 }
 
 func (a App) Init() tea.Cmd {
-	return tea.Batch(loadLocalDir(a.local.path), tea.RequestBackgroundColor, themeFallbackTimeout(), themePollTick())
+	return tea.Batch(loadLocalDir(a.local.path), loadProfiles(), tea.RequestBackgroundColor, themeFallbackTimeout(), themePollTick())
 }
 
 // themeFallbackTimeout guards tea.RequestBackgroundColor: bubbletea sends the
@@ -373,6 +374,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 
+		if a.focus == focusConnectionBar && a.connBar.modalOpen() {
+			a.connBar, cmd = a.connBar.Update(msg)
+			return a, cmd
+		}
+
 		// A panel's own jump-to-path input, its new-directory input, its
 		// rename input, its delete confirmation, and a filter query being
 		// typed are all modal in the same way: while any is focused, global
@@ -384,13 +390,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		filtering := a.focusedPanelFiltering()
 
 		// q/Q quits except where a literal "q" needs to reach a text field
-		// instead: a jump-to-path input, a filter query being typed, or the
-		// connection bar focused on Host/User/Pass. Protocol and Port take no
-		// free text -- letters never reach Port's input at all -- so both
-		// have nothing to lose.
-		connBarTypingText := a.focus == focusConnectionBar &&
-			a.connBar.focused != fieldProtocol &&
-			a.connBar.focused != fieldPort
+		// instead: a jump-to-path input, a filter query being typed, or a
+		// connection-bar text field. Protocol, Auth and Port take no free
+		// text -- letters never reach Port's input at all -- so none of them
+		// have anything to lose.
+		connBarTypingText := a.focus == focusConnectionBar && a.connBar.typingText()
 		if key.Matches(msg, keyQuit) && !jumping && !filtering && !connBarTypingText {
 			if a.client != nil {
 				a.client.Disconnect()
@@ -413,6 +417,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch {
+		case key.Matches(msg, keyProfiles):
+			a.focus = focusConnectionBar
+			a.connBar = a.connBar.openProfiles()
+			return a, nil
 		case key.Matches(msg, keyConnect):
 			a.focus = focusConnectionBar
 			return a, nil
@@ -469,6 +477,27 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// jumping, or a filter is typing or applied: fall through so the
 			// panel's own Update closes/cancels/clears whichever it is.
 		}
+
+	case profilesLoadedMsg:
+		a.connBar = a.connBar.withProfilesLoaded(msg)
+		if msg.err != nil {
+			a.log = a.log.Add("Unable to load saved profiles: "+msg.err.Error(), LogError)
+		}
+		return a, nil
+
+	case profileWriteRequestMsg:
+		return a.handleProfileWrite(msg)
+
+	case profileWriteDoneMsg:
+		a.connBar = a.connBar.withProfileWriteDone(msg)
+		if msg.err != nil {
+			a.log = a.log.Add("Unable to save profile changes: "+msg.err.Error(), LogError)
+		} else if msg.kind == profileWriteSave {
+			a.log = a.log.Add("Saved profile "+msg.name, LogSuccess)
+		} else {
+			a.log = a.log.Add("Deleted profile "+msg.name, LogSuccess)
+		}
+		return a, nil
 
 	case ConnectMsg:
 		return a.handleConnect(msg)
@@ -746,14 +775,20 @@ func (a App) hintsView() string {
 	leadWidth := lipgloss.Width(identity) + lipgloss.Width(gap)
 
 	km := footerKeyMap{
-		focus:        a.focus,
-		connecting:   a.connecting,
-		helpOpen:     a.helpOpen,
-		fileInfoOpen: a.fileInfoOpen,
-		jumping:      a.focusedPanelJumping(),
-		creatingDir:  a.focusedPanelCreatingDir(),
-		renaming:     a.focusedPanelRenaming(),
-		deleting:     a.focusedPanelDeleting(),
+		focus:                a.focus,
+		connecting:           a.connecting,
+		helpOpen:             a.helpOpen,
+		fileInfoOpen:         a.fileInfoOpen,
+		jumping:              a.focusedPanelJumping(),
+		creatingDir:          a.focusedPanelCreatingDir(),
+		renaming:             a.focusedPanelRenaming(),
+		deleting:             a.focusedPanelDeleting(),
+		keyPickerOpen:        a.connBar.picker.open,
+		profilePickerOpen:    a.connBar.profilePicker.open,
+		profileSaveOpen:      a.connBar.profileSave.open,
+		profileDeleteConfirm: a.connBar.profilePicker.confirmDelete,
+		profileOverwrite:     a.connBar.profileSave.overwriting,
+		identityFieldFocused: a.connBar.focused == fieldIdentity,
 	}
 	hints := renderHints(km.ShortHelp(), a.width-leadWidth)
 
@@ -804,6 +839,54 @@ func renderHints(bindings []key.Binding, width int) string {
 	return b.String()
 }
 
+func (a App) handleProfileWrite(msg profileWriteRequestMsg) (App, tea.Cmd) {
+	profiles := append([]config.Profile(nil), a.connBar.profiles...)
+	name := msg.name
+	switch msg.kind {
+	case profileWriteSave:
+		index := -1
+		for i, profile := range profiles {
+			if strings.EqualFold(profile.Name, msg.profile.Name) {
+				index = i
+				break
+			}
+		}
+		if index >= 0 {
+			msg.profile.Name = profiles[index].Name
+			profiles[index] = msg.profile
+		} else {
+			profiles = append(profiles, msg.profile)
+		}
+		name = msg.profile.Name
+	case profileWriteDelete:
+		found := false
+		remaining := make([]config.Profile, 0, len(profiles))
+		for _, profile := range profiles {
+			if strings.EqualFold(profile.Name, msg.name) {
+				found = true
+				continue
+			}
+			remaining = append(remaining, profile)
+		}
+		if !found {
+			return a, func() tea.Msg {
+				return profileWriteDoneMsg{kind: msg.kind, name: msg.name, err: fmt.Errorf("profile %q no longer exists", msg.name)}
+			}
+		}
+		profiles = remaining
+	default:
+		return a, func() tea.Msg {
+			return profileWriteDoneMsg{kind: msg.kind, name: msg.name, err: fmt.Errorf("unsupported profile operation")}
+		}
+	}
+
+	cfg := config.Config{Version: config.CurrentVersion, Profiles: profiles}
+	return a, func() tea.Msg {
+		err := config.Save(cfg)
+		return profileWriteDoneMsg{kind: msg.kind, profiles: profiles, name: name, err: err}
+	}
+}
+
 func (a App) handleConnect(msg ConnectMsg) (App, tea.Cmd) {
 	port, err := strconv.Atoi(msg.Port)
 	if err != nil || port <= 0 {
@@ -821,6 +904,15 @@ func (a App) handleConnect(msg ConnectMsg) (App, tea.Cmd) {
 		logger = a.protoLog
 	}
 	c := client.New(msg.Protocol, logger)
+	options := client.ConnectionOptions{
+		Host:          msg.Host,
+		User:          msg.User,
+		Password:      msg.Pass,
+		Port:          port,
+		SFTPAuth:      msg.SFTPAuth,
+		IdentityFile:  msg.IdentityFile,
+		KeyPassphrase: msg.KeyPassphrase,
+	}
 	addr := net.JoinHostPort(msg.Host, strconv.Itoa(port))
 
 	a.connecting = true
@@ -830,7 +922,7 @@ func (a App) handleConnect(msg ConnectMsg) (App, tea.Cmd) {
 	a.log = a.log.Add("Connecting to "+addr+" over "+msg.Protocol.String(), LogInfo)
 
 	attempt := func() tea.Msg {
-		if err := c.Connect(msg.Host, msg.User, msg.Pass, port); err != nil {
+		if err := c.Connect(options); err != nil {
 			return connectFailedMsg{seq: seq, err: err}
 		}
 		return connectedMsg{seq: seq, client: c, addr: addr, user: msg.User, protocol: msg.Protocol}
@@ -858,7 +950,14 @@ func (a App) handleConnected(msg connectedMsg) (App, tea.Cmd) {
 	a.focus = focusLocal
 	a.log = a.log.Add("Connected to "+msg.addr, LogSuccess)
 
-	return a, loadRemoteDir(msg.client, "/")
+	initialDir, err := msg.client.InitialDir()
+	if err != nil {
+		a.log = a.log.Add("Unable to determine remote starting directory; opening /: "+err.Error(), LogInfo)
+	}
+	if initialDir == "" {
+		initialDir = "/"
+	}
+	return a, loadRemoteDir(msg.client, initialDir)
 }
 
 func (a App) handleConnectFailed(msg connectFailedMsg) (App, tea.Cmd) {

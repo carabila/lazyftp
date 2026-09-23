@@ -5,6 +5,19 @@ All notable changes to lazyftp are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- SFTP connections can authenticate with either a password or an identity file, including
+  passphrase-protected private keys. The connection dialog includes a local file picker for
+  identity files; SSH-agent support is not included.
+- Save, select, update and delete named connection profiles from the connection dialog. Profiles
+  are stored in `~/.lazyftp/config.json`; server passwords are plaintext, while SSH key passphrases
+  are never saved.
+- After connecting, the Remote panel opens at the server-reported login working directory, usually
+  the remote user's home, instead of always starting at `/`.
+
 ## [0.3.1] - 2026-09-07
 
 Two Windows-consistency fixes and two layout/discoverability fixes, found in a post-release
