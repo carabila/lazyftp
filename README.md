@@ -5,11 +5,11 @@
 A simple, keyboard-driven TUI FTP, FTPS and SFTP client inspired by
 [lazygit](https://github.com/jesseduffield/lazygit).
 
-[![Release](https://img.shields.io/github/v/release/MawCeron/lazyftp?style=for-the-badge)](https://github.com/MawCeron/lazyftp/releases/latest)
+[![Release](https://img.shields.io/github/v/release/carabila/lazyftp?style=for-the-badge)](https://github.com/carabila/lazyftp/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go)](https://go.dev)
-[![Build](https://img.shields.io/github/actions/workflow/status/MawCeron/lazyftp/ci.yml?style=for-the-badge)](https://github.com/MawCeron/lazyftp/actions)
-[![License](https://img.shields.io/github/license/MawCeron/lazyftp?style=for-the-badge)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/MawCeron/lazyftp?style=for-the-badge)](https://github.com/MawCeron/lazyftp/stargazers)
+[![Build](https://img.shields.io/github/actions/workflow/status/carabila/lazyftp/ci.yml?style=for-the-badge)](https://github.com/carabila/lazyftp/actions)
+[![License](https://img.shields.io/github/license/carabila/lazyftp?style=for-the-badge)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/carabila/lazyftp?style=for-the-badge)](https://github.com/carabila/lazyftp/stargazers)
 
 <img src="assets/demo.gif" alt="lazyftp connecting over SFTP, then uploading a local file and downloading a remote one, both panels refreshing live" width="100%">
 
@@ -60,7 +60,7 @@ from the keyboard.
 ### Download a binary
 
 Packages and archives for Linux, macOS and Windows are on the
-[latest release](https://github.com/MawCeron/lazyftp/releases/latest), for both x86-64 and arm64.
+[latest release](https://github.com/carabila/lazyftp/releases/latest), for both x86-64 and arm64.
 No Go toolchain needed.
 
 Debian, Ubuntu:
@@ -80,7 +80,7 @@ Anywhere else, unpack the archive and put `lazyftp` somewhere on your `PATH`.
 ### From source
 
 ```bash
-git clone https://github.com/MawCeron/lazyftp.git
+git clone https://github.com/carabila/lazyftp.git
 cd lazyftp
 go build -o lazyftp .
 ```
@@ -88,7 +88,7 @@ go build -o lazyftp .
 ### With go install
 
 ```bash
-go install github.com/MawCeron/lazyftp@latest
+go install github.com/carabila/lazyftp@latest
 ```
 
 ---
@@ -277,7 +277,7 @@ lazyftp/
 | v0.5.0 | Transfer queue and permissions |
 
 See [ROADMAP.md](ROADMAP.md) for what each release contains and why, or the
-[milestones](https://github.com/MawCeron/lazyftp/milestones) for progress.
+[milestones](https://github.com/carabila/lazyftp/milestones) for progress.
 
 ---
 
@@ -293,14 +293,22 @@ See [ROADMAP.md](ROADMAP.md) for what each release contains and why, or the
 
 ---
 
+## Credits
+
+This fork is based on the original lazyftp project by [MawCeron](https://github.com/MawCeron):
+[github.com/MawCeron/lazyftp](https://github.com/MawCeron/lazyftp). Thanks to the original author
+for creating and sharing the project.
+
+---
+
 ## Contributing
 
 Pull requests are welcome — see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 For anything larger than a fix, open an issue before writing code.
 
-<a href="https://github.com/MawCeron/lazyftp/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=MawCeron/lazyftp" alt="Contributors" />
+<a href="https://github.com/carabila/lazyftp/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=carabila/lazyftp" alt="Contributors" />
 </a>
 
 ---

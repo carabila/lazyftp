@@ -22,7 +22,7 @@ nfpms:
   - package_name: lazyftp
     vendor: Mauricio Cerón
     maintainer: Mauricio Cerón <ceron.maw@gmail.com>
-    homepage: https://github.com/MawCeron/lazyftp
+    homepage: https://github.com/carabila/lazyftp
     description: A simple, keyboard-driven TUI FTP, FTPS and SFTP client.
     license: MIT
     section: net
@@ -52,4 +52,4 @@ changelog:
 release:
   footer: |
     Full notes, including the earlier releases:
-    https://github.com/MawCeron/lazyftp/blob/main/CHANGELOG.md
+    https://github.com/carabila/lazyftp/blob/main/CHANGELOG.md

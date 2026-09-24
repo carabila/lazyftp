@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MawCeron/lazyftp/internal/model"
-	"github.com/MawCeron/lazyftp/internal/shared"
+	"github.com/carabila/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/shared"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )

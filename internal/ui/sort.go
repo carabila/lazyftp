@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/MawCeron/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/model"
 )
 
 type sortColumn int

@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/MawCeron/lazyftp/internal/client"
-	"github.com/MawCeron/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/client"
+	"github.com/carabila/lazyftp/internal/model"
 )
 
 // noopModel is the minimal tea.Model a headless Program needs to run so that

@@ -244,7 +244,7 @@ using DOS/IIS format instead of Unix — goftp's parser only understands the lat
 error for the former. `FTPClient.readDir` catches that specific parse error and falls back to
 `readDirDOS`, which reissues `LIST` over a raw connection outside the pool and parses it itself;
 Unix-style listings never take this path, so the fallback costs nothing when it isn't needed.
-([#86](https://github.com/MawCeron/lazyftp/issues/86))
+([#86](https://github.com/carabila/lazyftp/issues/86))
 
 **There is no chmod.** `SITE CHMOD` sits outside the FTP standard and goftp does not implement
 it, so changing permissions is an SFTP-only feature rather than one with an FTP gap.
@@ -352,11 +352,11 @@ lazyftp connects to whatever answers and never warns that the key changed. This 
 password and identity-file authentication; key authentication does not establish that the server
 is the one the user intended to reach. Documented rather than buried because a user should be able
 to find it out before trusting it with credentials.
-([#38](https://github.com/MawCeron/lazyftp/issues/38))
+([#38](https://github.com/carabila/lazyftp/issues/38))
 
 **Transfers are unbounded and cannot be stopped.** `Manager.Enqueue` starts one goroutine per job
 with no concurrency limit and no way to cancel, so marking a hundred files opens a hundred
-transfers. ([#44](https://github.com/MawCeron/lazyftp/issues/44))
+transfers. ([#44](https://github.com/carabila/lazyftp/issues/44))
 
 ## Running and testing it
 

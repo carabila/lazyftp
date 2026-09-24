@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/MawCeron/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/model"
 	"github.com/mattn/go-runewidth"
 )
 

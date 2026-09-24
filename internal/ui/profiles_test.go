@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/MawCeron/lazyftp/internal/client"
-	"github.com/MawCeron/lazyftp/internal/config"
+	"github.com/carabila/lazyftp/internal/client"
+	"github.com/carabila/lazyftp/internal/config"
 )
 
 func TestProfileFromPasswordFormStoresPassword(t *testing.T) {

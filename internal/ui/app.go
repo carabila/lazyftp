@@ -13,13 +13,14 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/MawCeron/lazyftp/internal/client"
-	"github.com/MawCeron/lazyftp/internal/config"
-	"github.com/MawCeron/lazyftp/internal/model"
-	"github.com/MawCeron/lazyftp/internal/shared"
-	"github.com/MawCeron/lazyftp/internal/transfer"
+	"github.com/carabila/lazyftp/internal/client"
+	"github.com/carabila/lazyftp/internal/config"
+	"github.com/carabila/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/shared"
+	"github.com/carabila/lazyftp/internal/transfer"
 )
 
 type focus int
@@ -33,10 +34,11 @@ const (
 )
 
 type App struct {
-	width    int
-	height   int
-	focus    focus
-	helpOpen bool
+	width        int
+	height       int
+	focus        focus
+	helpOpen     bool
+	helpViewport viewport.Model
 
 	fileInfoOpen bool
 	fileInfoFile model.FileInfo
@@ -102,6 +104,7 @@ func NewApp(p func() *tea.Program, verbose bool, logFile io.Writer, version stri
 		processes:     NewProcessesPanel(),
 		log:           NewLogPanel(logFile),
 		spinner:       spinner.New(spinner.WithSpinner(spinner.Dot)),
+		helpViewport:  viewport.New(),
 		program:       p,
 		verbose:       verbose,
 		version:       version,
@@ -243,7 +246,7 @@ const (
 	// work, Processes and Log are placeholder text ("no transfers", "no
 	// logs") in the common idle case. Past it, extra height is split with
 	// the bottom panels too, so a tall terminal doesn't leave them pinned at
-	// their floor forever. ([#70](https://github.com/MawCeron/lazyftp/issues/70))
+	// their floor forever. ([#70](https://github.com/carabila/lazyftp/issues/70))
 	panelComfortHeight = 20
 )
 
@@ -281,6 +284,27 @@ func (a App) bottomPanelHeight(bottomH int) int {
 		h = 4
 	}
 	return h
+}
+
+// sizeHelpViewport keeps the scrollable help content aligned with the
+// overlay's available canvas, leaving the status and footer rows visible.
+func (a *App) sizeHelpViewport() {
+	_, panelH, bottomH := a.heights()
+	width, height, content := helpScreenLayout(a.width, panelH+bottomH)
+
+	contentWidth := borderInteriorWidth(width)
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+	contentHeight := height - 2
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	a.helpViewport.SetWidth(contentWidth)
+	a.helpViewport.SetHeight(contentHeight)
+	a.helpViewport.SoftWrap = false // helpScreenLayout already wraps to this width.
+	a.helpViewport.SetContent(content)
 }
 
 // focusedPanelFiltering reports whether the currently focused file panel is
@@ -328,6 +352,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.remote = a.remote.SetSize(panelW, panelH)
 		a.log = a.log.SetSize(panelW, a.bottomPanelHeight(bottomH))
 		a.processes = a.processes.SetSize(panelW, a.bottomPanelHeight(bottomH))
+		a.sizeHelpViewport()
 		return a, nil
 
 	case tea.BackgroundColorMsg:
@@ -356,14 +381,15 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 		}
 
-		// The help screen is modal: while it's open, every key either closes
-		// it or is swallowed, same as the connection dialog owning the
-		// keyboard while it has focus.
+		// The help screen is modal: scrolling keys reach its viewport, while
+		// Esc/? close it and all other app actions remain swallowed.
 		if a.helpOpen {
 			if key.Matches(msg, keyEsc) || key.Matches(msg, keyHelp) {
 				a.helpOpen = false
+				return a, nil
 			}
-			return a, nil
+			a.helpViewport, cmd = a.helpViewport.Update(msg)
+			return a, cmd
 		}
 
 		// Same modal treatment as the help screen -- only Esc closes it.
@@ -406,6 +432,8 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case key.Matches(msg, keyHelp):
 				a.helpOpen = true
+				a.sizeHelpViewport()
+				a.helpViewport.GotoTop()
 				return a, nil
 
 			case key.Matches(msg, keyUpload):
@@ -604,16 +632,16 @@ func (a App) render() string {
 	status := a.statusLine()
 	hints := a.hintsView()
 
-	// The connection dialog and the help screen are both fixed-size overlays,
-	// not a mode any panel needs to stay visible under: blanking them avoids
-	// the overlay cutting their text off mid-word wherever it overlaps.
+	// The connection dialog and help screen are modal overlays, not a mode any
+	// panel needs to stay visible under: blanking them avoids the overlay
+	// cutting their text off mid-word wherever it overlaps.
 	if a.focus == focusConnectionBar || a.helpOpen {
 		base := lipgloss.JoinVertical(lipgloss.Left, status, blankArea(a.width, panelH), blankArea(a.width, bottomH), hints)
 		if a.helpOpen {
 			// Capped to the blank canvas itself (panelH+bottomH), not the
 			// full height: the status line above it and the hints below
 			// are not part of that canvas and must stay clear.
-			return a.withOverlay(base, helpScreenView(a.width, panelH+bottomH))
+			return a.withOverlay(base, helpScreenView(a.width, panelH+bottomH, a.helpViewport))
 		}
 		return a.withOverlay(base, a.connBar.View(a.width))
 	}

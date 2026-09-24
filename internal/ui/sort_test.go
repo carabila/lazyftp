@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MawCeron/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/model"
 )
 
 func names(files []model.FileInfo) []string {

@@ -3,7 +3,7 @@ package client
 import (
 	"time"
 
-	"github.com/MawCeron/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/model"
 )
 
 // dialTimeout bounds how long establishing a connection may take. Left unset,

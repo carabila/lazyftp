@@ -7,7 +7,7 @@ Thanks for helping out. lazyftp is a small project, so this is short.
 Comment on the issue you want and it will be assigned to you, so two people don't write the
 same patch.
 
-Issues labelled [`good first issue`](https://github.com/MawCeron/lazyftp/labels/good%20first%20issue)
+Issues labelled [`good first issue`](https://github.com/carabila/lazyftp/labels/good%20first%20issue)
 are self-contained and don't need any prior knowledge of the codebase.
 
 [ROADMAP.md](../ROADMAP.md) says what each release is for and why the issues are ordered the way

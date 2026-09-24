@@ -1,4 +1,4 @@
-module github.com/MawCeron/lazyftp
+module github.com/carabila/lazyftp
 
 go 1.25.0
 

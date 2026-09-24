@@ -12,7 +12,7 @@ import (
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
-	"github.com/MawCeron/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/model"
 )
 
 // runFilterCmd runs a command returned from a Panel and feeds any resulting

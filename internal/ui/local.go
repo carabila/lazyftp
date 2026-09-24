@@ -3,7 +3,7 @@ package ui
 import (
 	"os"
 
-	"github.com/MawCeron/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/model"
 )
 
 func listLocalDir(path string) ([]model.FileInfo, error) {

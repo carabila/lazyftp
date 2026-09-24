@@ -12,9 +12,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/MawCeron/lazyftp/internal/client"
-	"github.com/MawCeron/lazyftp/internal/model"
-	"github.com/MawCeron/lazyftp/internal/shared"
+	"github.com/carabila/lazyftp/internal/client"
+	"github.com/carabila/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/shared"
 )
 
 // stubClient stands in for a server. Only Disconnect is observed: abandoning an
@@ -682,6 +682,74 @@ func TestLogScrollKeysOnlyReachTheViewportWhenFocused(t *testing.T) {
 	a = model.(App)
 	if a.log.viewport.AtBottom() {
 		t.Error("k did not scroll the Log viewport while it had focus")
+	}
+}
+
+// Help is a modal overlay, but unlike the old static screen its full key
+// reference remains reachable through the viewport on short terminals.
+func TestHelpViewportScrollsThroughAllGroupsAndCloses(t *testing.T) {
+	a := NewApp(nil, false, nil, "dev", false)
+	a.focus = focusLocal
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	a = model.(App)
+
+	model, _ = a.Update(tea.KeyPressMsg{Code: '?', Text: "?"})
+	a = model.(App)
+	if !a.helpOpen {
+		t.Fatal("? did not open Help")
+	}
+	if a.helpViewport.YOffset() != 0 {
+		t.Fatal("Help should open at the top of the reference")
+	}
+	if !strings.Contains(a.helpViewport.View(), "Global") {
+		t.Fatal("first help group is not visible when Help opens")
+	}
+	for _, hint := range []string{"esc", "↑/k", "↓/j"} {
+		if !strings.Contains(a.hintsView(), hint) {
+			t.Errorf("Help footer does not show %q", hint)
+		}
+	}
+
+	// Keep paging until the viewport reaches the end; the last context title
+	// must be visible rather than clipped by the overlay's height cap.
+	for i := 0; i < 20 && !a.helpViewport.AtBottom(); i++ {
+		model, _ = a.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
+		a = model.(App)
+	}
+	if !a.helpViewport.AtBottom() {
+		t.Fatal("Help viewport did not scroll to the bottom")
+	}
+	if !strings.Contains(a.helpViewport.View(), "Saved profiles") {
+		t.Error("last help group is not visible at the bottom of the viewport")
+	}
+
+	// Normal application shortcuts remain swallowed while Help is open.
+	model, cmd := a.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
+	a = model.(App)
+	if cmd != nil || !a.helpOpen {
+		t.Error("q should not quit or close the modal Help screen")
+	}
+
+	model, _ = a.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	a = model.(App)
+	if a.helpOpen {
+		t.Error("Esc did not close Help")
+	}
+}
+
+func TestHelpViewportResizesWithTheOverlayCanvas(t *testing.T) {
+	a := NewApp(nil, false, nil, "dev", false)
+	a.focus = focusLocal
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	a = model.(App)
+	model, _ = a.Update(tea.KeyPressMsg{Code: '?', Text: "?"})
+	a = model.(App)
+	shortHeight := a.helpViewport.Height()
+
+	model, _ = a.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+	a = model.(App)
+	if got := a.helpViewport.Height(); got <= shortHeight {
+		t.Errorf("help viewport height after resize = %d, want more than %d", got, shortHeight)
 	}
 }
 

@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/MawCeron/lazyftp/internal/client"
-	"github.com/MawCeron/lazyftp/internal/model"
-	"github.com/MawCeron/lazyftp/internal/shared"
+	"github.com/carabila/lazyftp/internal/client"
+	"github.com/carabila/lazyftp/internal/model"
+	"github.com/carabila/lazyftp/internal/shared"
 )
 
 // transferSeq hands out the ID that ties a transfer's Start/Progress/Error/Done

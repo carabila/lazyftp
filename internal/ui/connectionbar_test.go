@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/MawCeron/lazyftp/internal/client"
+	"github.com/carabila/lazyftp/internal/client"
 )
 
 func keyMsg(s string) tea.KeyPressMsg {

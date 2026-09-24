@@ -9,7 +9,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/MawCeron/lazyftp/internal/ui"
+	"github.com/carabila/lazyftp/internal/ui"
 )
 
 // Set by the linker from the tag being built. A build from source keeps "dev".

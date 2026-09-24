@@ -7,7 +7,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/MawCeron/lazyftp/internal/shared"
+	"github.com/carabila/lazyftp/internal/shared"
 	"github.com/mattn/go-runewidth"
 )
 

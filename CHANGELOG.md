@@ -34,7 +34,7 @@ review of v0.3.0.
   timestamp in a small overlay, for when the panel is too narrow to show the size/date columns.
   It composites over the real view instead of blanking it like the help screen and connection
   dialog do, so the listing stays visible (and can be partially covered) behind it.
-  ([#71](https://github.com/MawCeron/lazyftp/issues/71))
+  ([#71](https://github.com/carabila/lazyftp/issues/71))
 
 ### Fixed
 
@@ -42,7 +42,7 @@ review of v0.3.0.
   Local and Remote were already down to their own 8-row minimum while the two panels most often
   showing idle placeholder text ("no transfers", "no logs") got more space. File panels now get
   priority for extra height, and Processes/Log still grow on a tall terminal instead of staying
-  pinned at a constant. ([#70](https://github.com/MawCeron/lazyftp/issues/70))
+  pinned at a constant. ([#70](https://github.com/carabila/lazyftp/issues/70))
 - Renaming a local file or directory onto an already-existing destination was inconsistent across
   platforms: POSIX silently replaced an existing empty directory, Windows refused it outright with
   a raw API error. Both now refuse with one clear message, matching how SFTP's own rename already
@@ -60,31 +60,31 @@ refreshes on success.
 ### Added
 
 - Create directories with `Ctrl+N`: an inline input appears, `Enter` creates it and reloads the
-  panel, `Esc` or an empty name cancels. ([#9](https://github.com/MawCeron/lazyftp/issues/9))
+  panel, `Esc` or an empty name cancels. ([#9](https://github.com/carabila/lazyftp/issues/9))
 - Rename files and directories with `F2`, pre-filled with the current name -- `r` was already
   bound to refresh, so this doesn't reuse the letter the issue originally asked for.
-  ([#7](https://github.com/MawCeron/lazyftp/issues/7))
+  ([#7](https://github.com/carabila/lazyftp/issues/7))
 - Delete files and directories with `d`. A confirmation prompt names the file or the count of
   marked files being deleted; deleting a directory removes its contents recursively on both FTP
   and SFTP. A failure on one target doesn't abandon the rest of a multi-file delete.
-  ([#8](https://github.com/MawCeron/lazyftp/issues/8))
+  ([#8](https://github.com/carabila/lazyftp/issues/8))
 - Toggle hidden (dot) file visibility per panel with `Ctrl+H`. Visible by default, matching the
-  behavior before this existed. ([#5](https://github.com/MawCeron/lazyftp/issues/5))
+  behavior before this existed. ([#5](https://github.com/carabila/lazyftp/issues/5))
 - Downloading a marked directory now recurses into it, the same way uploading one already did.
-  ([#35](https://github.com/MawCeron/lazyftp/issues/35))
+  ([#35](https://github.com/carabila/lazyftp/issues/35))
 - A bare `~` or a `~/`-prefixed path typed into jump-to-path expands to the home directory, on
   the local panel only -- `~` has no universal meaning over FTP/SFTP.
-  ([#78](https://github.com/MawCeron/lazyftp/issues/78))
+  ([#78](https://github.com/carabila/lazyftp/issues/78))
 
 ### Fixed
 
 - Listing a directory failed against Windows/IIS FTP servers, which return `LIST` output in DOS
   format instead of Unix and don't support `MLSD`. Falls back to parsing the DOS format only when
   the normal path fails, so a Unix server pays no extra cost.
-  ([#86](https://github.com/MawCeron/lazyftp/issues/86))
+  ([#86](https://github.com/carabila/lazyftp/issues/86))
 - Remote paths were built with `filepath.Join`/`Dir`/`Base`, which use the host's own separator.
   Harmless on Linux and macOS, this sent backslash-separated paths to the server and broke every
-  transfer on a Windows client. ([#77](https://github.com/MawCeron/lazyftp/issues/77))
+  transfer on a Windows client. ([#77](https://github.com/carabila/lazyftp/issues/77))
 - Re-uploading a directory that already exists on the remote errored and abandoned the whole
   subtree, instead of merging into it the way a single file upload already overwrites an existing
   one.
@@ -104,7 +104,7 @@ recover from the unexpected.
 - Both palettes are now truecolor hex, each value checked with WCAG contrast against a
   representative dark and light background; `colorMuted` (readable secondary text) and
   `colorBorder` (structural lines) no longer share one value tuned for neither role well.
-  ([#76](https://github.com/MawCeron/lazyftp/issues/76))
+  ([#76](https://github.com/carabila/lazyftp/issues/76))
 - `colorMuted` on the light theme cleared WCAG AA by only 0.07:1 -- technically passing but too
   close to the line to read comfortably in practice. Darkened for a real margin.
 - A terminal or multiplexer that never answers the background-color query (tmux without
@@ -123,10 +123,10 @@ recover from the unexpected.
   could hang the connection attempt forever; the connect timeout now covers that negotiation too.
 - Bordered panels rendered 2 columns narrower than the width they were asked for; side by side,
   Local and Remote came out 4 columns short of the terminal's real width.
-  ([#82](https://github.com/MawCeron/lazyftp/issues/82))
+  ([#82](https://github.com/carabila/lazyftp/issues/82))
 - A selected or marked file row's highlight broke into visible gaps at each column boundary,
   because the separating spaces between name/size/date were never rendered through the row's own
-  style. ([#83](https://github.com/MawCeron/lazyftp/issues/83))
+  style. ([#83](https://github.com/carabila/lazyftp/issues/83))
 
 ## [0.2.0] - 2026-08-28
 
@@ -140,76 +140,76 @@ filter, and a diff view between both sides.
   bordered panel. `Esc` dismisses it without disturbing panel state. Connected, a segmented
   status line shows protocol, user, host, connection state and, once anything is marked, a
   marked-file count -- visibility that previously meant opening Processes or counting checkmarks
-  by eye. ([#24](https://github.com/MawCeron/lazyftp/issues/24),
-  [#74](https://github.com/MawCeron/lazyftp/issues/74))
+  by eye. ([#24](https://github.com/carabila/lazyftp/issues/24),
+  [#74](https://github.com/carabila/lazyftp/issues/74))
 - The status line and footer render as solid, full-width bars instead of loose text on the
   terminal's own background, matching every other bordered element in the interface.
-  ([#72](https://github.com/MawCeron/lazyftp/issues/72))
+  ([#72](https://github.com/carabila/lazyftp/issues/72))
 - The layout responds to terminal size instead of assuming a large window: the full two-panel
   view above 120 columns, a narrower baseline layout down to 80, a single Tab-switched panel
   below that, and a clear "terminal too small" message below 60x20 instead of a broken render.
-  ([#23](https://github.com/MawCeron/lazyftp/issues/23))
+  ([#23](https://github.com/carabila/lazyftp/issues/23))
 - Panels show file size and modification date alongside the name, right-aligned and
   fixed-width, degrading gracefully as the panel narrows.
-  ([#29](https://github.com/MawCeron/lazyftp/issues/29))
+  ([#29](https://github.com/carabila/lazyftp/issues/29))
 - Sort by name, size or modification date, reversible, with the active column and direction
   shown in the panel header. Directories still group first, and the choice is kept per panel
-  for the session. ([#30](https://github.com/MawCeron/lazyftp/issues/30))
+  for the session. ([#30](https://github.com/carabila/lazyftp/issues/30))
 - Fuzzy filtering with `/`, with a live match counter (`12/340`) and `Esc` to clear -- thanks to
-  [@OdaloV](https://github.com/OdaloV). ([#31](https://github.com/MawCeron/lazyftp/issues/31))
+  [@OdaloV](https://github.com/OdaloV). ([#31](https://github.com/carabila/lazyftp/issues/31))
 - Jump directly to a path by typing it with `:`, on either panel, using that panel's own path
-  conventions. ([#33](https://github.com/MawCeron/lazyftp/issues/33))
+  conventions. ([#33](https://github.com/carabila/lazyftp/issues/33))
 - The Log and Processes panels can take focus and scroll through their full retained history,
   instead of only ever showing whatever fits on screen.
-  ([#32](https://github.com/MawCeron/lazyftp/issues/32),
-  [#75](https://github.com/MawCeron/lazyftp/issues/75))
+  ([#32](https://github.com/carabila/lazyftp/issues/32),
+  [#75](https://github.com/carabila/lazyftp/issues/75))
 - `--highlight-diff` marks, in both panels, entries that exist on only one side or that share a
   name but differ in size -- comparison by name and exact byte count only, nothing timestamp-based
-  that plain FTP can't guarantee. Off by default. ([#52](https://github.com/MawCeron/lazyftp/issues/52))
+  that plain FTP can't guarantee. Off by default. ([#52](https://github.com/carabila/lazyftp/issues/52))
 - `U`/`D` upload or download whichever side has marked files, regardless of which panel has
   focus, alongside the existing focus-dependent `t`.
-  ([#67](https://github.com/MawCeron/lazyftp/issues/67))
+  ([#67](https://github.com/carabila/lazyftp/issues/67))
 - A help screen (`?`) lists every keybinding grouped by context; the footer now shows only the
   handful most useful for the focused panel instead of eight hints fighting for 80 columns.
-  ([#26](https://github.com/MawCeron/lazyftp/issues/26))
+  ([#26](https://github.com/carabila/lazyftp/issues/26))
 - Success and error log entries carry a label alongside their color, readable in monochrome or
-  with `NO_COLOR` set. ([#64](https://github.com/MawCeron/lazyftp/issues/64))
+  with `NO_COLOR` set. ([#64](https://github.com/carabila/lazyftp/issues/64))
 
 ### Changed
 
 - Keybindings realigned to standard TUI convention: `Ctrl+C` now quits cleanly from anywhere,
   `Space` toggles a mark (replacing `x`), `h`/`l` are aliases for up/open instead of silently
   triggering the file list's own pagination, and `r` refreshes the focused panel.
-  ([#66](https://github.com/MawCeron/lazyftp/issues/66))
+  ([#66](https://github.com/carabila/lazyftp/issues/66))
 - Migrated to Bubble Tea v2, Lipgloss v2 and Bubbles v2 -- the infrastructure the overlay
   connection dialog needed, since only v2's layer compositor can float a form over the panels
   without a full-view swap. No visible behavior change on its own.
-  ([#65](https://github.com/MawCeron/lazyftp/issues/65))
+  ([#65](https://github.com/carabila/lazyftp/issues/65))
 - Colors moved from raw 256-palette codes scattered across six files to named semantic tokens,
   and per-row style objects are now built once instead of every frame. Groundwork for loadable
-  themes; no visual change from this alone. ([#25](https://github.com/MawCeron/lazyftp/issues/25))
+  themes; no visual change from this alone. ([#25](https://github.com/carabila/lazyftp/issues/25))
 
 ### Fixed
 
 - A marked file that was also under the cursor lost its checkmark, because both shared one
   character slot -- marking was then only visible as a background color, invisible in
   monochrome or with `NO_COLOR` set. Cursor and mark now have their own columns.
-  ([#28](https://github.com/MawCeron/lazyftp/issues/28))
+  ([#28](https://github.com/carabila/lazyftp/issues/28))
 - Filenames with accents or other multi-byte characters could be truncated mid-character in the
   Processes and Log panels, rendering a replacement character. Truncation and column alignment
   now go by display width everywhere, not byte length.
-  ([#27](https://github.com/MawCeron/lazyftp/issues/27))
+  ([#27](https://github.com/carabila/lazyftp/issues/27))
 - A long path could wrap to two lines instead of truncating at the 80-column floor, misaligning
   a panel's bottom border against its neighbor -- content width was computed two cells short of
   what a bordered, padded box actually has available.
-  ([#68](https://github.com/MawCeron/lazyftp/issues/68))
+  ([#68](https://github.com/carabila/lazyftp/issues/68))
 - The connection dialog let panel text behind it show through at its edges instead of owning a
   clean space; the panels now render blank while the dialog has focus.
-  ([#69](https://github.com/MawCeron/lazyftp/issues/69))
+  ([#69](https://github.com/carabila/lazyftp/issues/69))
 - **Every panel rendered one row short of the height it was given**, which pushed the footer up
   off the true bottom of the terminal in normal view. `Height(N)` on a bordered box is the box's
   total row count, not the content area on top of its border.
-  ([#73](https://github.com/MawCeron/lazyftp/issues/73))
+  ([#73](https://github.com/carabila/lazyftp/issues/73))
 
 ## [0.1.2] - 2026-08-13
 
@@ -220,74 +220,74 @@ to be.
 ### Added
 
 - Protocol selector in the connection bar — FTP, FTPS or SFTP, cycled with `←` / `→`. SFTP on a
-  non-standard port is now reachable. ([#14](https://github.com/MawCeron/lazyftp/issues/14))
+  non-standard port is now reachable. ([#14](https://github.com/carabila/lazyftp/issues/14))
 - FTPS support over explicit TLS. Certificates are verified, so a server with a self-signed
   certificate is refused rather than silently accepted.
-  ([#14](https://github.com/MawCeron/lazyftp/issues/14))
+  ([#14](https://github.com/carabila/lazyftp/issues/14))
 - `--verbose` writes the FTP control dialogue to the Log panel. Passwords are masked.
-  ([#12](https://github.com/MawCeron/lazyftp/issues/12))
+  ([#12](https://github.com/carabila/lazyftp/issues/12))
 - `--log-file <path>` writes the log to a file as well, so it can be searched, kept or attached
-  to a bug report. ([#56](https://github.com/MawCeron/lazyftp/issues/56))
+  to a bug report. ([#56](https://github.com/carabila/lazyftp/issues/56))
 - A connection attempt now shows a spinner and the elapsed time, and `Esc` hands the interface
   back without waiting for it to finish.
-  ([#15](https://github.com/MawCeron/lazyftp/issues/15))
+  ([#15](https://github.com/carabila/lazyftp/issues/15))
 - Prebuilt binaries for Linux, macOS and Windows, on x86-64 and arm64. Installing no longer
-  requires a Go toolchain. ([#21](https://github.com/MawCeron/lazyftp/issues/21))
+  requires a Go toolchain. ([#21](https://github.com/carabila/lazyftp/issues/21))
 - Continuous integration on Linux and Windows.
-  ([#20](https://github.com/MawCeron/lazyftp/issues/20))
+  ([#20](https://github.com/carabila/lazyftp/issues/20))
 - `--version` prints the version and exits, so a downloaded binary can be identified.
 
 ### Changed
 
 - The local panel opens in the directory lazyftp was launched from instead of the home
-  directory. ([#55](https://github.com/MawCeron/lazyftp/issues/55))
+  directory. ([#55](https://github.com/carabila/lazyftp/issues/55))
 - Connecting and listing a remote directory no longer block the interface.
-  ([#15](https://github.com/MawCeron/lazyftp/issues/15))
+  ([#15](https://github.com/carabila/lazyftp/issues/15))
 - Leaving the port field empty uses the selected protocol's default — 21 for FTP and FTPS, 22
   for SFTP — instead of always 22.
-  ([#14](https://github.com/MawCeron/lazyftp/issues/14))
+  ([#14](https://github.com/carabila/lazyftp/issues/14))
 - The FTP client moved from `jlaffaye/ftp` to `secsy/goftp`, for connections through NAT.
 
 ### Removed
 
 - Dead code: an unreachable hints module, two client interface methods nothing called, and a size
   formatter with no callers. Nothing changes for users — thanks to
-  [@OdaloV](https://github.com/OdaloV). ([#22](https://github.com/MawCeron/lazyftp/issues/22))
+  [@OdaloV](https://github.com/OdaloV). ([#22](https://github.com/carabila/lazyftp/issues/22))
 
 ### Fixed
 
 - **Plain FTP servers on port 21 could not be connected to.** An empty port field selected SFTP
   against a server that only speaks FTP, and the attempt then hung with no error.
-  ([#11](https://github.com/MawCeron/lazyftp/issues/11))
+  ([#11](https://github.com/carabila/lazyftp/issues/11))
 - Connecting over FTP reported success before reaching the server, so a wrong host or a refused
   login surfaced later as an empty panel.
-  ([#61](https://github.com/MawCeron/lazyftp/issues/61))
+  ([#61](https://github.com/carabila/lazyftp/issues/61))
 - Going up a directory from the local panel crashed on Windows.
-  ([#16](https://github.com/MawCeron/lazyftp/issues/16))
+  ([#16](https://github.com/carabila/lazyftp/issues/16))
 - Rendering crashed on very narrow terminals — thanks to
-  [@OdaloV](https://github.com/OdaloV). ([#18](https://github.com/MawCeron/lazyftp/issues/18))
+  [@OdaloV](https://github.com/OdaloV). ([#18](https://github.com/carabila/lazyftp/issues/18))
 - A failing transfer took the whole program down and left the terminal unusable.
-  ([#17](https://github.com/MawCeron/lazyftp/issues/17))
+  ([#17](https://github.com/carabila/lazyftp/issues/17))
 - The Processes panel computed its visible rows incorrectly — thanks to
   [@IzzaldinSamir](https://github.com/IzzaldinSamir).
-  ([#19](https://github.com/MawCeron/lazyftp/issues/19))
+  ([#19](https://github.com/carabila/lazyftp/issues/19))
 - Interrupted uploads started again from zero instead of resuming, even against servers that
-  support it. ([#54](https://github.com/MawCeron/lazyftp/issues/54))
+  support it. ([#54](https://github.com/carabila/lazyftp/issues/54))
 
 ### Security
 
 - SSH connections had no timeout at all, and the handshake had none even after one was added.
   A host accepting on port 22 without speaking SSH — an FTP server sharing the port, for
   instance — held the program indefinitely.
-  ([#58](https://github.com/MawCeron/lazyftp/issues/58),
-  [#60](https://github.com/MawCeron/lazyftp/issues/60))
+  ([#58](https://github.com/carabila/lazyftp/issues/58),
+  [#60](https://github.com/carabila/lazyftp/issues/60))
 
 ## [0.1.1] - 2026-04-21
 
 ### Added
 
 - Uploading a directory now uploads its contents recursively, creating the remote directories as
-  it goes. ([#1](https://github.com/MawCeron/lazyftp/issues/1))
+  it goes. ([#1](https://github.com/carabila/lazyftp/issues/1))
 
 ### Changed
 
@@ -296,7 +296,7 @@ to be.
 ### Fixed
 
 - The Processes and Log panels showed the oldest entries and never scrolled to the newest.
-  ([#2](https://github.com/MawCeron/lazyftp/issues/2))
+  ([#2](https://github.com/carabila/lazyftp/issues/2))
 - A narrow window crashed the Processes panel while drawing a progress bar.
 
 ## [0.1.0] - 2026-04-13
@@ -312,9 +312,9 @@ First working release.
 - Keyboard navigation, vim-style keys and arrows.
 - A hints bar reflecting the focused panel, and a panel logging transfers and connections.
 
-[Unreleased]: https://github.com/MawCeron/lazyftp/compare/v0.2.0...HEAD
-[0.2.1]: https://github.com/MawCeron/lazyftp/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/MawCeron/lazyftp/compare/v0.1.2...v0.2.0
-[0.1.2]: https://github.com/MawCeron/lazyftp/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/MawCeron/lazyftp/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/MawCeron/lazyftp/releases/tag/v0.1.0
+[Unreleased]: https://github.com/carabila/lazyftp/compare/v0.2.0...HEAD
+[0.2.1]: https://github.com/carabila/lazyftp/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/carabila/lazyftp/compare/v0.1.2...v0.2.0
+[0.1.2]: https://github.com/carabila/lazyftp/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/carabila/lazyftp/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/carabila/lazyftp/releases/tag/v0.1.0
